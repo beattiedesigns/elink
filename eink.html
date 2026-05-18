@@ -5,9 +5,7 @@
   <title>Conference Room Display</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     html, body {
       margin: 0;
@@ -20,18 +18,30 @@
       color: black;
     }
 
+    body.loading .screen {
+      visibility: hidden;
+    }
+
+    body.loading::before {
+      content: "Loading live data...";
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 800px;
+      height: 480px;
+      font-size: 28px;
+      font-weight: 700;
+    }
+
     .screen {
       width: 800px;
       height: 480px;
       display: grid;
       grid-template-columns: 600px 200px;
       grid-template-rows: 400px 80px;
-      border: 1px solid #ddd;
     }
 
     .main {
-      grid-column: 1;
-      grid-row: 1;
       padding: 28px 55px;
       position: relative;
     }
@@ -45,8 +55,8 @@
     .status {
       font-size: 88px;
       font-weight: 800;
-      margin-top: 120px;
-      letter-spacing: -3px;
+      margin-top: 90px;
+      letter-spacing: 0px;
     }
 
     .current-booking {
@@ -81,74 +91,127 @@
     .tokens {
       background: #000;
       color: #fff;
-      padding: 25px 38px;
-      text-align: left;
+      padding: 25px 34px;
+      overflow: hidden;
     }
 
     .tokens h2 {
       font-size: 18px;
-      margin: 0 0 30px 0;
+      margin: 0 0 28px 0;
       font-weight: 800;
     }
 
     .tokens p {
-      font-size: 20px;
+      font-size: 15px;
       font-weight: 800;
       letter-spacing: 2px;
       margin: 0 0 22px 0;
+      line-height: 1.1;
     }
 
     .footer {
       grid-column: 1;
       grid-row: 2;
       background: #efefef;
-      padding: 24px 55px;
+      padding: 20px 55px;
       font-size: 16px;
       font-weight: 600;
     }
 
-    .footer span {
+    .footer strong {
       font-weight: 800;
     }
   </style>
 </head>
 
-<body>
+<body class="loading">
 
   <div class="screen">
 
     <main class="main">
-      <h1 class="room-title">Conference Room</h1>
-
-      <div class="status">Available</div>
-
-      <div class="current-booking">
-        Panthion 11:00 am - 12:30 am
-      </div>
+      <h1 class="room-title" id="roomName">Loading...</h1>
+      <div class="status" id="status">Loading</div>
+      <div class="current-booking" id="currentBooking"></div>
     </main>
 
     <aside class="side">
       <div class="qr-box">
-        <img 
-          src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://example.com"
-          alt="QR Code"
-        >
+        <img id="qrCode" alt="QR Code">
       </div>
 
       <div class="tokens">
-        <h2>WIFI TOKENS</h2>
-        <p>03401-25817</p>
-        <p>10797-18997</p>
-        <p>80750-81337</p>
-        <p>49350-33031</p>
+        <h2>WIFI TOKENS </h2>
+        <p id="token1"></p>
+        <p id="token2"></p>
+        <p id="token3"></p>
+        <p id="token4"></p>
       </div>
     </aside>
 
     <footer class="footer">
-      <span>Next Meeting:</span> Roots & Shoots Thursday, Dec 14 2026 02.00 am - 15.30 pm
+      <strong>Next Meeting:</strong> <span id="nextMeeting"></span>
     </footer>
 
   </div>
+
+<script>
+  const DATA_URL = "https://script.google.com/macros/s/AKfycbyGIfyDoxv7XOBnJAwcuW09c0LVQeaCJmpA6HQcpns9sgsqqwrhd6gmKmSzunSO2vrETA/exec";
+
+  let firstLoad = true;
+  let lastDataString = "";
+
+  function updateDisplay(data) {
+    const newDataString = JSON.stringify(data);
+
+    // Only update the screen if the sheet data has actually changed
+    if (newDataString !== lastDataString) {
+      lastDataString = newDataString;
+
+      document.getElementById("roomName").innerText = data.roomName || "Conference Room";
+      document.getElementById("status").innerText = data.status || "Available";
+      document.getElementById("currentBooking").innerText = data.currentBooking || "";
+      document.getElementById("nextMeeting").innerText = data.nextMeeting || "";
+
+      document.getElementById("token1").innerText = data.token1 || "";
+      document.getElementById("token2").innerText = data.token2 || "";
+      document.getElementById("token3").innerText = data.token3 || "";
+      document.getElementById("token4").innerText = data.token4 || "";
+
+      document.getElementById("qrCode").src =
+        "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" +
+        encodeURIComponent(data.qrLink || "") +
+        "&t=" + Date.now();
+    }
+
+    if (firstLoad) {
+      document.body.classList.remove("loading");
+      firstLoad = false;
+    }
+  }
+
+  function loadData() {
+    const oldScript = document.getElementById("jsonpScript");
+    if (oldScript) oldScript.remove();
+
+    const script = document.createElement("script");
+    script.id = "jsonpScript";
+    script.src = DATA_URL + "?callback=updateDisplay&t=" + Date.now();
+
+    script.onerror = function() {
+      document.getElementById("status").innerText = "Offline";
+      document.getElementById("nextMeeting").innerText = "Could not load data";
+      document.body.classList.remove("loading");
+      firstLoad = false;
+    };
+
+    document.body.appendChild(script);
+  }
+
+  loadData();
+
+  // Check the Google Sheet every 10 seconds
+  setInterval(loadData, 10000);
+</script>
 
 </body>
 </html>
